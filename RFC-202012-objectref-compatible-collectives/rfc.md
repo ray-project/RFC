@@ -2,8 +2,8 @@
 
 | Status        | Proposed      |
 :-------------- |:---------------------------------------------------- |
-| **Author(s)** | Hao Zhang, Dacheng Li  |
-| **Sponsor**   | Ion Stoica               |
+| **Author(s)** | Hao Zhang, Dacheng Li |
+| **Sponsor**   | Ion Stoica, Stephanie Wang |
 | **Reviewer**  | |
 | **Updated**   | YYYY-MM-DD                                           |
 
