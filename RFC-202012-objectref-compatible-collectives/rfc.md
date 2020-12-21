@@ -134,10 +134,10 @@ querying the current ray object store.
 
 #### Cons
 
-(1) Since we submit the task and store the results ourselves, these collective operations are
+- Since we submit the task and store the results ourselves, these collective operations are
 invisible to ray. Thus we are lack of several ray's features, including fault tolerance at fails,
 and garbage collection. 
-(2) It is unclear how ray's scheduler will react to these invisible tasks. I.e., it may think 
+- It is unclear how ray's scheduler will react to these invisible tasks. I.e., it may think 
 these nodes are degenerated and tend to schedule less jobs to these nodes, while the resources at 
 these nodes are simply acquired by our collective operations.
 
