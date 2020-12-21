@@ -1,4 +1,4 @@
-# RFC-202011-collective-in-ray
+# RFC-202011-ObjectRef-compatible-collectives
 
 | Status        | Proposed      |
 :-------------- |:---------------------------------------------------- |
@@ -128,8 +128,8 @@ The basic APIs of the POS would mostly resemble that of the in-memory store, exp
 
 
 ### Unsolved Problems
-- How to put this POS inside the actor process? I am currently pretty fuzzy on this.
-
+- How to put this POS inside the actor process in Python? I am currently very fuzzy on this.
+- On possible way is to instantiate the POS at the first invocation of its `put` API, but if doing so, how to let the driver code query from the Object Store?
 
 
 #### Cons
