@@ -94,22 +94,17 @@ Also, to better support these objectrefs usage, we propose to add an additional 
 ### APIs
 
 we introduce the following new APIs:
-- @collective: The user can decorate a function with @collective to put the return value
-of this function in an in-memory object store for faster collective operations. Typically,
-user will decorate a function that prepares some data as collective, and uses these in-memory
-objects to do following collective operations.
+- `@pos`: The user can decorate a function with @pos to put the return value of this function in an in-memory object store for faster collective operations. Typically, user will decorate a function that prepares some data as collective, and uses these in-memory objects to do following collective operations.
 
-- allreduce_refs: The user can now use allreduce in the driver program, while before the user
-needs to write collective operations in actor classes. This function is proposed to compat better
-with our in-memory object-refs usage, and to give user more flexibility. See the below examples
-for details.
+- `{collective}_refs`: The user can now use allreduce in the driver program, while before the user
+needs to write collective operations in actor classes. This function is expected give user more flexibility. See the  examples for details.
 
 We next briefly discuss what implementations are needed to realize the above architecture.
 
 #### APIs and relevant modification to existing Ray 
-For Alternative #2, we potentially will need to modify the following part of the current codebase:
+For this proposal, we potentially will need to modify the following part of the current codebase:
 - When calling a remote actor method, we now need to check whether the method is decorated with
-@collective, if so, we only proceed with the new python in-memory object store (see Alternative #2
+@pos, if so, we only proceed with the new python in-memory object store (see Alternative #2
 for details), instead of using ray's object store.
 - Add new functions to support collective operations in the driver program (for example,
 allreduce_refs, see below for details). These functions will query our object store to get the
