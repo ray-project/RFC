@@ -12,18 +12,18 @@
 
 Based on [RFC-20201119-collective-in-ray](https://github.com/ray-project/RFC/blob/main/rfc-20201119-collective-in-ray/20201119-collective-in-ray.md), we have brought CCL libraries such as NCCL into Ray; see the current set of APIs under [python/ray/util/collective](https://github.com/ray-project/ray/tree/master/python/ray/util/collective).
 
-As of now, this set of collective APIs are supposed to work inside the code of an actor/task (but **NOT** in the driver code), in an *imperative* way; and they can only interact with the contents/arrays to be communicated, similar to most APIs in traditional CCLs (e.g., [torch.distributed](https://pytorch.org/docs/stable/distributed.html)). In this RFC, we expand this set of APIs to work with Ray ObjectRefs. Specifically, we will introduce a set of **more declarative** collective APIs that make use of ObjectRefs as inputs, such as `allreduce(ObjectRefs: List[ObjectRef])`, so users can flexibility use collective in driver code, or use it with Ray futures.
+As of now, this set of collective APIs are supposed to work inside the code of an actor/task (but **NOT** in the driver code), in an *imperative* way; and they can only interact with the contents/arrays to be communicated, similar to most APIs in traditional CCLs (e.g., [torch.distributed](https://pytorch.org/docs/stable/distributed.html)). In this RFC, we expand this set of APIs to work with Ray ObjectRefs. Specifically, we will introduce a set of **more declarative** collective APIs that make use of ObjectRefs as inputs, such as `allreduce(ObjectRefs: List[ObjectRef])`, so users can flexibility specify collectives in driver code, or use it with Ray futures.
 
 
 ## User Benefit
 
 The RFC enables users to 
 - use the CCL-based collective APIs over Ray ObjectRefs;
-- specify collective communication in a more Ray-ish (declarative) way; this sometimes might avoid situations where the user code cause deadlocks, such as trigger send/recv operations between two actors (see more details in [RFC-20201119-collective-in-ray](https://github.com/ray-project/RFC/blob/main/rfc-20201119-collective-in-ray/20201119-collective-in-ray.md))
-- In some scenario, it might reduce user code complexity and elimiate some boilerplate code when performing collective communication.
+- specify collective communication in a more Ray-ish (declarative) way; this sometimes might avoid situations where the user code cause deadlocks, when only triggering partial send/recv operations on two actors (see more details in [RFC-20201119-collective-in-ray](https://github.com/ray-project/RFC/blob/main/rfc-20201119-collective-in-ray/20201119-collective-in-ray.md))
+- in some scenario, it might reduce user code complexity and eliminate the boilerplate code typically a user has to write when using traditional CCLs.
 
-### An example use case
-Support a user is trying to specify GPU-to-GPU send/recv operations using the current set of collective APIs, among two actors in a collective group. Normally a user would do:
+### Example Use Cases
+Support a user is trying to specify GPU-to-GPU send/recv operations using the current set of collective APIs (or any existing CCLs in Ray), among two actors in a collective group. Normally a user would do:
 ```python
 import ray.util.collective as col
 
@@ -47,53 +47,56 @@ class CupyWorker:
         # this call is blocking as well
         col.allreduce(self.buffer)
         return self.buffer
-        
+
+# Create two actors
 A = CupyWorker.remote()
 B = CupyWorker.remote()
 
-# Put A and B in a collective group
+# Put A and B in a collective group using existing APIs
 col.declare_collective_group([A, B], options={rank=[0, 1], ...})
 
 # let A to send a message to B
 # the only way to trigger and complete this send/recv is by:
 ray.get([a.do_send.remote(target_rank=1), b.do_recv.remote(src_rank=0)])
+# Note in the above code, a send/recv has to be specified once at each worker
 
-# allreduce a message across two workers in the group
+# This is the same for any other collective communications.
+# allreduce a message across two workers in the group:
 ray.get([a.do_allreduce.remote(), b.do_allreduce.remote()])
 
 # The following code will hang, because it does instantiate the recv side call
 ray.get([a.do_send.remote(target_rank=1)])
-# This will also hang, cuz allreduce is sysmetric -- all processes need to make the call.
+# This will also hang, cuz allreduce is symmetric as well -- all processes need to make the call.
 ray.get([a.do_allreduce.remote()])
 
 # Following this way, the users needs to write the following code that does a round trip between A and B using send/recv:
-# it might hang as well, but we have resolved it by providing a better communicator management 
+# Previously we found it might hang as well, but we have resolved it by providing a better communicator management 
 ray.get([A.send.remote(target_rank=1), B.recv.remote(src_rank=0), A.recv.remote(src_rank=1), B.send.remote(target_rank=0)])
 ```
+Essentially, to perform collective communication between actors using existing collective APIs, we add substantial coding complexity (boilerplate code for triggering collectives on every participating process) to user code. This is the case for using any CCL library in Ray, such as `torch.distributed`, or MPI.
 
-Essentially, to perform collective communiaction between actors using the current set of collective APIs, we add substantial coding complexity (boilerplate code for triggering collectives on every participating process) to user code. This is the case for using any CCL library in Ray, such as `torch.distributed`, or horovod.
+In fact, when not using Ray, normally this "triggering" step is done by launching each collective process separately (i.e., launching `python my_collectve_program.py` or `mpiexec my_collective_program.py` on each node of the cluster). When using Ray, the user has to use `ray.get` or `ray.wait` to appropriately trigger collective calls in each actor/task. 
+To achieve this step, the users have to acquire all the actor handles of collective workers, and make the trigger calls. This might be error prone, as shown in the examples above:
+- sometimes the user might not be able to acquire all the actor handles;
+- the user might get confused on managing all different collective calls, and then making mistakes, e.g. forgetting to trigger the collective call on one actor; Consequently, then the collective operation hangs;
+- [Imaginary case] In some programs, if a recv call trigger has to be delayed until another blocking collective call is finished, while this blocking call depends on another call that replies on the recv call, this causes a deadlock.
 
-In fact, when not using Ray, normally this "triggering" step is done by launching each collective process separatly (i.e., launching `python my_collectve_program.py` or `mpiexec my_collective_program.py` on each node of the cluster). When using Ray, the user has to use `ray.get` or `ray.wait` to appropriately trigger collective calls in each actor/task. 
-For this step, the users have to acquire all the actor handles for collective workers, and make the trigger calls. This might be error prone, as shown in the examples above:
-- sometimes the user might not be able to acquire all the actor handles
-- the user might get confused on managing all different collective calls ane making mistakes, e.g. forgeting to trigger the collective call on one actor and then the collective operaion hangs
-- [Imagenary case] In some programs, if a recv call trigge has to be delayed until another blocking call is finished, while this blocking call depends on another call that replies on the recv call, this causes a deadlock
+To summarize, the current `ray.util.collective` APIs exhibits the same semantics with most existing CCL APIs. They specify group collective communication by **partially** specifying collective API calls on each process, and will block and wait until all participant processes have appropriatelytriggered the collective call. We argue **this method might be error-prone and sometimes cause deadlocks**.
 
-To summarize, the current collective APIs exhibits the same semantics with mostly existing CCL APIs. They allow users to partially specificy a collective communication on a subset of participants, and will block and wait until all participant processes have triggered the collective call, which might be error-prone and sometimes cause deadlocks.
-
-With Ray, we can actually improve the way collective calls are specified as follows:
+With Ray, we can actually improve this way of making collective calls as follows:
 ```python
+# create a collective group
 col.declare_collective_group([A, B], options={rank=[0, 1], ...})
 
 # Specify a collective allreduce "completely" instead of "partially" on each actor
 ray.util.collective.allreduce(A.get_buffer.remote(), B.get_buffer.remote())
 
-# Specificy a send/recv safely and "completely" instead of "partially" on each actor
+# Specify a send/recv safely and "completely" instead of "partially" on each actor
 A.recv.remote(B.get_buffer.remote())
 ```
-In the above code, we can use ObjectRef-compatible collective APIs to specify a collective communication **declaratively** and **completely** following Ray's design philosophy, instead of sysmetrically as normally done in CCLs (we might understand this by connecting this pattern with the `in-graph` and `between-graph` parallelization in TensorFlow, see [this stackoverflow thread](https://stackoverflow.com/questions/41600321/distributed-tensorflow-the-difference-between-in-graph-replication-and-between#:~:text=Between%2Dgraph%20replication.,train.) and Derek Murray's explanations)
+In the above code, we can use ObjectRef-compatible collective APIs to specify a collective communication **declaratively** and **completely** following Ray's design philosophy, instead of symmetrically as normally done in CCLs (we might connect this pattern with the `in-graph` parallelization in TensorFlow, see [this StackOverflow thread](https://stackoverflow.com/questions/41600321/distributed-tensorflow-the-difference-between-in-graph-replication-and-between#:~:text=Between%2Dgraph%20replication.,train., in contrast to teh `between-graph` parallelization) and Derek Murray's explanations)
 
-This design is supposed to overcome the aforementioned disadvantages (deadlocks, etc.), and can potentially reduce user code complexity. As an example, users use one line to specify a group communicaiton, instead of multiple triggers in each process of the collective group.
+This design is supposed to overcome the aforementioned disadvantages (deadlocks, etc.), and can potentially reduce user code complexity. As an example, users use one line to declare a group communication, instead of multiple partial calls in each process of the collective group.
 
 A design to realize the above feature is presented below.
 
