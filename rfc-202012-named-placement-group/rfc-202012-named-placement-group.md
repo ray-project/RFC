@@ -1,4 +1,4 @@
-# RFC-202012-named-placement-group
+# RFC-202012-named-nodes-in-placement-group
 
 | Status        | Proposed      |
 :-------------- |:---------------------------------------------------- |
@@ -9,13 +9,16 @@
 
 
 ## Objective
+In many distributed ML applications, for better system performance, we need to precisely place a computation-heavy task on a specific type of node of cluster suitable for computation, whereas a communication-heavy task/actor on a high-bandwidth node.
 
+
+Ray currently does not **explicitly** support this type of placement semantic. This RFC proposes to use existing Ray functions (e.g., `PlacementGroup`) to produce a "placement" feature, so we can place an actor/task on a designated node that meets the resource condition (e.g. a parameter server on a CPU-only high-bandwidth node), as long as we know the cluster configurations in advance.  
 
 ### Non-goals
 
 
 ## User Benefit
-
+With this feature, the users can have finer control when specifying resource bundles. Compared to existing `PACK`, `SPREAD` strategies, the user now can specify resource bundles on designated nodes of the cluster, so to place their actors/tasks on desired nodes with cluster awareness.
 
 ## Design Proposal
 
@@ -91,9 +94,13 @@ nodes are both lists, and each element in the bundle will be placed in the corre
 
 ### Unsolved Problems
 
-As far as we understand, current ray cannot understand general GPU type. Thus, we can only specify the desired node
-where the remote actor is placed. However, we don't have control to place an actor on an exact GPU, which is ideal for
-a fine-grained optimization, where we consider a 3080 GPU to be more powerful than a 1080 GPU.
+
+#### Place on a device level
+As far as we understand, current Racy cannot understand general GPU types. Thus, we are only able to specify bundles against physical cluster nodes, but not at the granularity of devices, such as requesting a GPU as "the P100 GPU on node A".
+This finer grain control might be ideal for distributed ML optimization, e.g., put heavy ML computation on a more powerful 3080 GPU where lighter computation on a 1080 GPU.
+
+#### Working with the supported accelerator types in Ray
+The current Ray supports and can recognize several accelerator types, such as "V100", "P100", etc. -- essentially most of the AWS-supported GPU devices. See [ray/util/accelerator/accelerator.py](https://github.com/ray-project/ray/blob/master/python/ray/util/accelerators/accelerators.py). As long as Ray can recognize these devices as supported resources, We might extend this feature to understand these device types and support finer placement over a designated GPU device. We are currently figuring out more details on this.
 
 
 #### Cons
@@ -101,27 +108,15 @@ a fine-grained optimization, where we consider a 3080 GPU to be more powerful th
 
 
 #### Pros
-
-
-
-### Alternative Design
-#### Pros
-#### Cons
 
 
 ### Other Considerations
 
 
 ### Performance Implications
-
+None.
 
 ### Dependencies
-
-### Engineering Impact
-
-
-### Platforms and Environments
-
 
 ### Best Practices
 
