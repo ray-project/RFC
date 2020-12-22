@@ -39,7 +39,7 @@ class GPUActor:
 
 gpu_actors = [GPUActor.options(
         placement_group=pg,
-        placement_group_bundle_index=1) # Index of gpu_bundle is 0.
+        placement_group_bundle_index=1) # Index of gpu_bundle is 1.
     .remote() for _ in range(2)]
 ```
 
@@ -50,7 +50,7 @@ pg = placement_group([{"CPU": 2}, {"GPU": 2}], nodes = [node_ip_1, node_ip_2])
 ray.get(pg.ready())
 gpu_actors = [GPUActor.options(
         placement_group=pg,
-        placement_group_bundle_index=1) # Index of gpu_bundle is 0.
+        placement_group_bundle_index=1) # Index of gpu_bundle is 1.
     .remote() for _ in range(2)]
 ```
 
