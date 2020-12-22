@@ -194,6 +194,8 @@ Compared to the previous implementation:
 ### Other Considerations
 For this proposed design and the two possible implementations, since they use a out-of-band POS, they cannot benefit from any features the Ray in-memory or plasma store provides, such as fault tolerance, etc.
 
+After some discussion with Stephanie, we might favor the second way of implementation because it it least disruptive to the existing Ray code. We might need more practical use cases to validate that the set of ObjectRef-compatible collectives are useful. Then we can promote it into the `ray.actor` implementation following the first proposal, which can further simplify the interface.
+
 
 ### Performance Implications
 - The collective communication performance in unaffected and is only determined by the CCL library.
