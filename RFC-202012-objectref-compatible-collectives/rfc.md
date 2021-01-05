@@ -94,7 +94,7 @@ ray.util.collective.allreduce(A.get_buffer.remote(), B.get_buffer.remote())
 # Specify a send/recv safely and "completely" instead of "partially" on each actor
 A.recv.remote(B.get_buffer.remote())
 ```
-In the above code, we can use ObjectRef-compatible collective APIs to specify a collective communication **declaratively** and **completely** following Ray's design philosophy, instead of symmetrically as normally done in CCLs (we might connect this pattern with the `in-graph` parallelization in TensorFlow, see [this StackOverflow thread](https://stackoverflow.com/questions/41600321/distributed-tensorflow-the-difference-between-in-graph-replication-and-between#:~:text=Between%2Dgraph%20replication.,train., in contrast to teh `between-graph` parallelization) and Derek Murray's explanations)
+In the above code, we can use ObjectRef-compatible collective APIs to specify a collective communication **declaratively** and **completely** following Ray's design philosophy, instead of symmetrically as normally done in CCLs (we might connect this pattern with the `in-graph` parallelization in TensorFlow, see [this StackOverflow thread](https://stackoverflow.com/questions/41600321/distributed-tensorflow-the-difference-between-in-graph-replication-and-between) in contrast to the `between-graph` parallelization.
 
 This design is supposed to overcome the aforementioned disadvantages (deadlocks, etc.), and can potentially reduce user code complexity. As an example, users use one line to declare a group communication, instead of multiple partial calls in each process of the collective group.
 
