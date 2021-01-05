@@ -2,7 +2,7 @@
 
 | Status        | (Proposed / Accepted / Implemented / Obsolete)       |
 :-------------- |:---------------------------------------------------- |
-| **RFC #**     | [NNN](https://github.com/Ray/community/pull/NNN) (update when you have PR #)|
+| **RFC #**     | [NNN](https://github.com/ray-project/ray/pulls/NNN) (update when you have PR #)|
 | **Author(s)** | My Name (me@example.org), AN Other (you@example.org) |
 | **Sponsor**   | A N Expert (whomever@anyscale.com)                 |
 | **Updated**   | YYYY-MM-DD                                           |
